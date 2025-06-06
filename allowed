@@ -1,6 +1,5 @@
 -- Список разрешенных HWID (замените на свои)
 local ALLOWED_HWIDS = {
-    ["HWID_8FBE39DF"] = true,
     ["HWID_12345678"] = true,
     -- Добавьте другие разрешенные HWID
 }
