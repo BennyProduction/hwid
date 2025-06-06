@@ -1,3 +1,100 @@
+-- Серверный скрипт (в ServerScriptService)
 local ALLOWED_HWIDS = {
-HWID_8FBE39DF
+    ["HWID_12345678"] = true,  -- Добавьте свои HWID
 }
+
+-- Функция для получения HWID игрока (адаптированная для сервера)
+local function GetPlayerHWID(player)
+    -- Запрос HWID у клиента через RemoteEvent
+    local remoteEvent = Instance.new("RemoteEvent")
+    remoteEvent.Name = "GetPlayerHWIDEvent"
+    remoteEvent.Parent = player:WaitForChild("PlayerScripts")
+    
+    local hwid = nil
+    local success, err = pcall(function()
+        hwid = remoteEvent:InvokeClient(player)
+    end)
+    
+    remoteEvent:Destroy()
+    
+    if not success then
+        warn("Failed to get HWID from player "..player.Name..": "..tostring(err))
+        return nil
+    end
+    
+    return hwid
+end
+
+-- Клиентский скрипт (в PlayerScripts)
+local function CreateClientHWIDScript()
+    local script = Instance.new("LocalScript")
+    script.Name = "ClientHWIDScript"
+    
+    script.Source = [[
+        local player = game:GetService("Players").LocalPlayer
+        local remoteEvent = player:WaitForChild("PlayerScripts"):WaitForChild("GetPlayerHWIDEvent")
+        
+        -- Ваша функция GetPersistentHWID (немного упрощенная)
+        local function GetPersistentHWID()
+            local hwid_components = {}
+            
+            local function try_add(id_name, get_func)
+                local success, value = pcall(get_func)
+                if success and value then
+                    table.insert(hwid_components, id_name..":"..tostring(value))
+                end
+            end
+
+            try_add("ClientId", function() return game:GetService("RbxAnalyticsService"):GetClientId() end)
+            try_add("HardwareId", function()
+                if syn and syn.get_hwid then return syn.get_hwid() end
+                if get_hwid then return get_hwid() end
+                return nil
+            end)
+
+            local raw_hwid = table.concat(hwid_components, "||")
+            local function secure_hash(s)
+                local h = 5381
+                for i = 1, #s do h = (h * 33 + string.byte(s, i)) % 2^32 end
+                return string.format("%08X", h)
+            end
+            
+            return "HWID_"..secure_hash(raw_hwid)
+        end
+        
+        remoteEvent.OnServerEvent:Connect(function()
+            local hwid = GetPersistentHWID()
+            remoteEvent:FireServer(hwid)
+        end)
+    ]]
+    
+    return script
+end
+
+-- Основная логика проверки
+game:GetService("Players").PlayerAdded:Connect(function(player)
+    -- Ждем немного перед проверкой
+    task.wait(3)
+    
+    if not player then return end
+    
+    -- Создаем клиентский скрипт для игрока
+    local clientScript = CreateClientHWIDScript()
+    clientScript.Parent = player:WaitForChild("PlayerScripts")
+    
+    -- Получаем HWID
+    local hwid = GetPlayerHWID(player)
+    
+    if not hwid then
+        player:Kick("Не удалось определить ваш HWID. Попробуйте перезайти.")
+        return
+    end
+    
+    -- Проверяем HWID
+    if not ALLOWED_HWIDS[hwid] then
+        player:Kick("Ваш HWID не авторизован на этом сервере.\nHWID: "..hwid)
+        return
+    end
+    
+    print("Игрок "..player.Name.." прошел проверку HWID ("..hwid..")")
+end)
