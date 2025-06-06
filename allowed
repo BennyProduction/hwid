@@ -1,0 +1,3 @@
+local ALLOWED_HWIDS = {
+HWID_8FBE39DF
+}
