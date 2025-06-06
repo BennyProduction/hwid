@@ -1,6 +1,6 @@
 -- Список РАЗРЕШЕННЫХ HWID (замените на свои реальные)
 local ALLOWED_HWIDS = {
-    ["HWID_12345678"] = true,
+    ["HWID_12345678"] = true
     -- Добавьте другие разрешенные HWID
 }
 
@@ -44,71 +44,11 @@ end
 local function StrictHWIDCheck()
     -- Получаем HWID игрока
     local playerHWID = GetRealHWID()
-    print("[HWID Check] Ваш HWID:", playerHWID)
     
     -- Проверяем наличие в списке разрешенных
     if not ALLOWED_HWIDS[playerHWID] then
-        print("[HWID Check] Доступ запрещен! HWID не найден в списке разрешенных.")
-        
-        -- Создаем сообщение об ошибке
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "HWID_Error"
-        gui.Parent = game:GetService("CoreGui")
-
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 400, 0, 200)
-        frame.Position = UDim2.new(0.5, -200, 0.5, -100)
-        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        frame.BorderSizePixel = 0
-        frame.Parent = gui
-
-        local title = Instance.new("TextLabel")
-        title.Text = "ОШИБКА ДОСТУПА"
-        title.TextColor3 = Color3.fromRGB(255, 80, 80)
-        title.TextSize = 20
-        title.Font = Enum.Font.GothamBold
-        title.Size = UDim2.new(1, 0, 0, 50)
-        title.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        title.BorderSizePixel = 0
-        title.Parent = frame
-
-        local msg = Instance.new("TextLabel")
-        msg.Text = "Ваш HWID не авторизован!\n\nHWID: "..playerHWID.."\n\nОбратитесь к администратору"
-        msg.TextColor3 = Color3.fromRGB(255, 255, 255)
-        msg.TextSize = 16
-        msg.Font = Enum.Font.Gotham
-        msg.Size = UDim2.new(1, -20, 0.7, -10)
-        msg.Position = UDim2.new(0, 10, 0, 60)
-        msg.BackgroundTransparency = 1
-        msg.TextYAlignment = Enum.TextYAlignment.Top
-        msg.Parent = frame
-
-        local closeBtn = Instance.new("TextButton")
-        closeBtn.Text = "Закрыть"
-        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        closeBtn.TextSize = 14
-        closeBtn.Font = Enum.Font.Gotham
-        closeBtn.Size = UDim2.new(0.6, 0, 0, 35)
-        closeBtn.Position = UDim2.new(0.2, 0, 0.85, -17)
-        closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-        closeBtn.BorderSizePixel = 0
-        closeBtn.Parent = frame
-
-        closeBtn.MouseButton1Click:Connect(function()
-            gui:Destroy()
-            -- Кикаем игрока после закрытия окна
-            game:GetService("Players").LocalPlayer:Kick("HWID не авторизован: "..playerHWID)
-        end)
-        
-        -- Альтернативный кик через 10 секунд, если окно не закрыли
-        delay(10, function()
-            if gui and gui.Parent then
-                gui:Destroy()
-                game:GetService("Players").LocalPlayer:Kick("HWID не авторизован: "..playerHWID)
-            end
-        end)
-    else
-        print("[HWID Check] Доступ разрешен!")
+        -- Немедленный кик без GUI
+        game:GetService("Players").LocalPlayer:Kick("Ваш HWID не авторизован: "..playerHWID)
     end
 end
 
