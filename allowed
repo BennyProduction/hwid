@@ -1,19 +1,21 @@
--- Список разрешенных HWID (замените на свои)
+-- Список РАЗРЕШЕННЫХ HWID (замените на свои реальные)
 local ALLOWED_HWIDS = {
     ["HWID_12345678"] = true,
+    -- Добавьте другие разрешенные HWID
 }
 
--- Функция получения HWID (ваш код с небольшими изменениями)
-local function GetPersistentHWID()
+local function GetRealHWID()
     local hwid_components = {}
     
+    -- Функция безопасного добавления идентификаторов
     local function try_add(id_name, get_func)
         local success, value = pcall(get_func)
-        if success and value then
+        if success and value and tostring(value) ~= "" then
             table.insert(hwid_components, id_name..":"..tostring(value))
         end
     end
 
+    -- Пытаемся получить различные идентификаторы
     try_add("ClientId", function() return game:GetService("RbxAnalyticsService"):GetClientId() end)
     try_add("HardwareId", function()
         if syn and syn.get_hwid then return syn.get_hwid() end
@@ -21,79 +23,94 @@ local function GetPersistentHWID()
         return nil
     end)
 
+    -- Если не получили ни одного ID - создаем случайный
+    if #hwid_components == 0 then
+        table.insert(hwid_components, "FallbackId:"..tostring(math.random(10000,99999)))
+    end
+
+    -- Генерируем финальный HWID
     local raw_hwid = table.concat(hwid_components, "||")
     local function secure_hash(s)
         local h = 5381
-        for i = 1, #s do h = (h * 33 + string.byte(s, i)) % 2^32 end
+        for i = 1, #s do 
+            h = (h * 33 + string.byte(s, i)) % 2^32 
+        end
         return string.format("%08X", h)
     end
     
     return "HWID_"..secure_hash(raw_hwid)
 end
 
--- Функция проверки и кика
-local function CheckAndKickIfNeeded()
-    local playerHWID = GetPersistentHWID()
-    print("Ваш HWID:", playerHWID)
+local function StrictHWIDCheck()
+    -- Получаем HWID игрока
+    local playerHWID = GetRealHWID()
+    print("[HWID Check] Ваш HWID:", playerHWID)
     
-    -- Создаем GUI с HWID (ваш код)
-    pcall(function()
+    -- Проверяем наличие в списке разрешенных
+    if not ALLOWED_HWIDS[playerHWID] then
+        print("[HWID Check] Доступ запрещен! HWID не найден в списке разрешенных.")
+        
+        -- Создаем сообщение об ошибке
         local gui = Instance.new("ScreenGui")
-        gui.Name = "HWID_Notification"
+        gui.Name = "HWID_Error"
         gui.Parent = game:GetService("CoreGui")
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 350, 0, 150)
-        frame.Position = UDim2.new(0.5, -175, 0.5, -75)
-        frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        frame.Size = UDim2.new(0, 400, 0, 200)
+        frame.Position = UDim2.new(0.5, -200, 0.5, -100)
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         frame.BorderSizePixel = 0
         frame.Parent = gui
 
         local title = Instance.new("TextLabel")
-        title.Text = "HWID CHECK"
-        title.TextColor3 = Color3.fromRGB(255, 255, 255)
-        title.TextSize = 18
+        title.Text = "ОШИБКА ДОСТУПА"
+        title.TextColor3 = Color3.fromRGB(255, 80, 80)
+        title.TextSize = 20
         title.Font = Enum.Font.GothamBold
-        title.Size = UDim2.new(1, 0, 0, 40)
-        title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        title.Size = UDim2.new(1, 0, 0, 50)
+        title.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
         title.BorderSizePixel = 0
         title.Parent = frame
 
-        local hwid_label = Instance.new("TextLabel")
-        hwid_label.Text = playerHWID
-        hwid_label.TextColor3 = Color3.fromRGB(100, 255, 100)
-        hwid_label.TextSize = 20
-        hwid_label.Font = Enum.Font.RobotoMono
-        hwid_label.Size = UDim2.new(1, -20, 0, 50)
-        hwid_label.Position = UDim2.new(0, 10, 0, 45)
-        hwid_label.BackgroundTransparency = 1
-        hwid_label.TextXAlignment = Enum.TextXAlignment.Center
-        hwid_label.Parent = frame
+        local msg = Instance.new("TextLabel")
+        msg.Text = "Ваш HWID не авторизован!\n\nHWID: "..playerHWID.."\n\nОбратитесь к администратору"
+        msg.TextColor3 = Color3.fromRGB(255, 255, 255)
+        msg.TextSize = 16
+        msg.Font = Enum.Font.Gotham
+        msg.Size = UDim2.new(1, -20, 0.7, -10)
+        msg.Position = UDim2.new(0, 10, 0, 60)
+        msg.BackgroundTransparency = 1
+        msg.TextYAlignment = Enum.TextYAlignment.Top
+        msg.Parent = frame
 
-        local close_button = Instance.new("TextButton")
-        close_button.Text = "Закрыть"
-        close_button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        close_button.TextSize = 14
-        close_button.Font = Enum.Font.Gotham
-        close_button.Size = UDim2.new(0.6, 0, 0, 30)
-        close_button.Position = UDim2.new(0.2, 0, 0, 100)
-        close_button.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
-        close_button.BorderSizePixel = 0
-        close_button.Parent = frame
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Text = "Закрыть"
+        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        closeBtn.TextSize = 14
+        closeBtn.Font = Enum.Font.Gotham
+        closeBtn.Size = UDim2.new(0.6, 0, 0, 35)
+        closeBtn.Position = UDim2.new(0.2, 0, 0.85, -17)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Parent = frame
 
-        close_button.MouseButton1Click:Connect(function()
+        closeBtn.MouseButton1Click:Connect(function()
             gui:Destroy()
+            -- Кикаем игрока после закрытия окна
+            game:GetService("Players").LocalPlayer:Kick("HWID не авторизован: "..playerHWID)
         end)
-    end)
-    
-    -- Проверка на наличие в списке разрешенных
-    if not ALLOWED_HWIDS[playerHWID] then
-        game:GetService("Players").LocalPlayer:Kick("\n\n🚫 Доступ запрещен!\nВаш HWID: "..playerHWID.."\n\nОбратитесь к администратору")
-        return false
+        
+        -- Альтернативный кик через 10 секунд, если окно не закрыли
+        delay(10, function()
+            if gui and gui.Parent then
+                gui:Destroy()
+                game:GetService("Players").LocalPlayer:Kick("HWID не авторизован: "..playerHWID)
+            end
+        end)
+    else
+        print("[HWID Check] Доступ разрешен!")
     end
-    
-    return true
 end
 
--- Запуск проверки
-CheckAndKickIfNeeded()
+-- Запускаем проверку
+StrictHWIDCheck()
