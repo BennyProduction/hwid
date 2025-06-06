@@ -1,48 +1,62 @@
 local ALLOWED_HWIDS = {
-    ["HWID_ABCD1234"] = true,
-    -- Добавьте свои HWID
+    ["HWID_ABCD1234"] = true
 }
 
---- Функция получения HWID (аппаратный ID)
-local function GetHWID()
-    -- Если используется Synapse X, Cheat Engine или другие инжекторы
+-- Функция получения HWID (аппаратный ID)
+local function GetRealHWID()
+    -- 1. Попытка через Synapse X/Cheat Engine
     if syn and syn.get_hwid then
-        return "HWID_" .. syn.get_hwid()
-    elseif get_hwid then
-        return "HWID_" .. get_hwid()
-    else
-        -- Альтернативные методы (Windows)
-        local cmd = "wmic csproduct get uuid"
-        local handle = io.popen(cmd)
+        return "HWID_" .. syn.get_hwid():upper():match("%X+")
+    end
+
+    -- 2. Попытка через другие Lua-инжекторы
+    if get_hwid and type(get_hwid) == "function" then
+        return "HWID_" .. get_hwid():upper():match("%X+")
+    end
+
+    -- 3. Через системные команды (Windows)
+    local handle = io.popen("wmic csproduct get uuid 2>nul")
+    if handle then
         local result = handle:read("*a")
         handle:close()
-        
-        -- Обработка вывода (пример для Windows)
-        if result then
-            local hwid = result:match("UUID%s+(%x+-%x+-%x+-%x+-%x+)")
-            if hwid then
-                return "HWID_" .. hwid:gsub("-", "")
-            end
+        local hwid = result:match("UUID%s+(%x+-%x+-%x+-%x+-%x+)")
+        if hwid then
+            return "HWID_" .. hwid:gsub("-", ""):upper()
         end
-        
-        -- Если ничего не сработало
-        return "HWID_UNKNOWN"
     end
+
+    -- 4. Через BIOS (альтернатива)
+    handle = io.popen("wmic bios get serialnumber 2>nul")
+    if handle then
+        local result = handle:read("*a")
+        handle:close()
+        local serial = result:match("SerialNumber%s+(%w+)")
+        if serial and serial ~= nil then
+            return "HWID_" .. serial:upper()
+        end
+    end
+
+    return "HWID_UNKNOWN"
 end
 
---- Проверка HWID
-local function CheckHWID()
-    local my_hwid = GetHWID()
-    print("Ваш HWID:", my_hwid)
-    
+-- Проверка и строгий выход
+local function StrictHWIDCheck()
+    local my_hwid = GetRealHWID()
+    print("[HWID] Ваш идентификатор: " .. my_hwid)
+
     if not ALLOWED_HWIDS[my_hwid] then
-        print("ОШИБКА: Ваш HWID не в списке разрешенных!")
-        os.exit() -- Завершение программы
-        -- Или: error("Доступ запрещен!")
+        print("[HWID] ОШИБКА: Доступ запрещен!")
+        
+        -- 1. Завершение процесса (жесткий метод)
+        os.execute("taskkill /f /im " .. arg[0]:match("[^\\]+$")) -- Windows
+        os.exit(1)
+
+        -- 2. Альтернатива: бесконечный цикл чтобы "заморозить" программу
+        while true do end
     else
-        print("Доступ разрешен!")
+        print("[HWID] Доступ разрешен!")
     end
 end
 
---- Запуск проверки
-CheckHWID()
+-- Запуск проверки при старте
+StrictHWIDCheck()
