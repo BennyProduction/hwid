@@ -1,7 +1,6 @@
--- Список РАЗРЕШЕННЫХ HWID (замените на свои реальные)
 local ALLOWED_HWIDS = {
     ["HWID_12345678"] = true
-    -- Добавьте другие разрешенные HWID
+    ["HWID_8FBE39DF"] = true
 }
 
 local function GetRealHWID()
@@ -48,7 +47,7 @@ local function StrictHWIDCheck()
     -- Проверяем наличие в списке разрешенных
     if not ALLOWED_HWIDS[playerHWID] then
         -- Немедленный кик без GUI
-        game:GetService("Players").LocalPlayer:Kick("Ваш HWID не авторизован: "..playerHWID)
+        game:GetService("Players").LocalPlayer:Kick("HWID is not authorized: "..playerHWID)
     end
 end
 
