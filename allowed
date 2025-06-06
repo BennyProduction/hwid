@@ -1,62 +1,101 @@
+-- Список разрешенных HWID (замените на свои)
 local ALLOWED_HWIDS = {
-    ["HWID_ABCD1234"] = true
+    ["HWID_8FBE39DF"] = true,
+    ["HWID_12345678"] = true,
+    -- Добавьте другие разрешенные HWID
 }
 
--- Функция получения HWID (аппаратный ID)
-local function GetRealHWID()
-    -- 1. Попытка через Synapse X/Cheat Engine
-    if syn and syn.get_hwid then
-        return "HWID_" .. syn.get_hwid():upper():match("%X+")
-    end
-
-    -- 2. Попытка через другие Lua-инжекторы
-    if get_hwid and type(get_hwid) == "function" then
-        return "HWID_" .. get_hwid():upper():match("%X+")
-    end
-
-    -- 3. Через системные команды (Windows)
-    local handle = io.popen("wmic csproduct get uuid 2>nul")
-    if handle then
-        local result = handle:read("*a")
-        handle:close()
-        local hwid = result:match("UUID%s+(%x+-%x+-%x+-%x+-%x+)")
-        if hwid then
-            return "HWID_" .. hwid:gsub("-", ""):upper()
+-- Функция получения HWID (ваш код с небольшими изменениями)
+local function GetPersistentHWID()
+    local hwid_components = {}
+    
+    local function try_add(id_name, get_func)
+        local success, value = pcall(get_func)
+        if success and value then
+            table.insert(hwid_components, id_name..":"..tostring(value))
         end
     end
 
-    -- 4. Через BIOS (альтернатива)
-    handle = io.popen("wmic bios get serialnumber 2>nul")
-    if handle then
-        local result = handle:read("*a")
-        handle:close()
-        local serial = result:match("SerialNumber%s+(%w+)")
-        if serial and serial ~= nil then
-            return "HWID_" .. serial:upper()
-        end
-    end
+    try_add("ClientId", function() return game:GetService("RbxAnalyticsService"):GetClientId() end)
+    try_add("HardwareId", function()
+        if syn and syn.get_hwid then return syn.get_hwid() end
+        if get_hwid then return get_hwid() end
+        return nil
+    end)
 
-    return "HWID_UNKNOWN"
+    local raw_hwid = table.concat(hwid_components, "||")
+    local function secure_hash(s)
+        local h = 5381
+        for i = 1, #s do h = (h * 33 + string.byte(s, i)) % 2^32 end
+        return string.format("%08X", h)
+    end
+    
+    return "HWID_"..secure_hash(raw_hwid)
 end
 
--- Проверка и строгий выход
-local function StrictHWIDCheck()
-    local my_hwid = GetRealHWID()
-    print("[HWID] Ваш идентификатор: " .. my_hwid)
+-- Функция проверки и кика
+local function CheckAndKickIfNeeded()
+    local playerHWID = GetPersistentHWID()
+    print("Ваш HWID:", playerHWID)
+    
+    -- Создаем GUI с HWID (ваш код)
+    pcall(function()
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "HWID_Notification"
+        gui.Parent = game:GetService("CoreGui")
 
-    if not ALLOWED_HWIDS[my_hwid] then
-        print("[HWID] ОШИБКА: Доступ запрещен!")
-        
-        -- 1. Завершение процесса (жесткий метод)
-        os.execute("taskkill /f /im " .. arg[0]:match("[^\\]+$")) -- Windows
-        os.exit(1)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 350, 0, 150)
+        frame.Position = UDim2.new(0.5, -175, 0.5, -75)
+        frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
 
-        -- 2. Альтернатива: бесконечный цикл чтобы "заморозить" программу
-        while true do end
-    else
-        print("[HWID] Доступ разрешен!")
+        local title = Instance.new("TextLabel")
+        title.Text = "HWID CHECK"
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.TextSize = 18
+        title.Font = Enum.Font.GothamBold
+        title.Size = UDim2.new(1, 0, 0, 40)
+        title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        title.BorderSizePixel = 0
+        title.Parent = frame
+
+        local hwid_label = Instance.new("TextLabel")
+        hwid_label.Text = playerHWID
+        hwid_label.TextColor3 = Color3.fromRGB(100, 255, 100)
+        hwid_label.TextSize = 20
+        hwid_label.Font = Enum.Font.RobotoMono
+        hwid_label.Size = UDim2.new(1, -20, 0, 50)
+        hwid_label.Position = UDim2.new(0, 10, 0, 45)
+        hwid_label.BackgroundTransparency = 1
+        hwid_label.TextXAlignment = Enum.TextXAlignment.Center
+        hwid_label.Parent = frame
+
+        local close_button = Instance.new("TextButton")
+        close_button.Text = "Закрыть"
+        close_button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        close_button.TextSize = 14
+        close_button.Font = Enum.Font.Gotham
+        close_button.Size = UDim2.new(0.6, 0, 0, 30)
+        close_button.Position = UDim2.new(0.2, 0, 0, 100)
+        close_button.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+        close_button.BorderSizePixel = 0
+        close_button.Parent = frame
+
+        close_button.MouseButton1Click:Connect(function()
+            gui:Destroy()
+        end)
+    end)
+    
+    -- Проверка на наличие в списке разрешенных
+    if not ALLOWED_HWIDS[playerHWID] then
+        game:GetService("Players").LocalPlayer:Kick("\n\n🚫 Доступ запрещен!\nВаш HWID: "..playerHWID.."\n\nОбратитесь к администратору")
+        return false
     end
+    
+    return true
 end
 
--- Запуск проверки при старте
-StrictHWIDCheck()
+-- Запуск проверки
+CheckAndKickIfNeeded()
