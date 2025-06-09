@@ -1,6 +1,5 @@
 local ALLOWED_HWIDS = {
     ["HWID_12345678"] = true
-    ["HWID_8FBE39DF"] = true
 }
 
 local function GetRealHWID()
